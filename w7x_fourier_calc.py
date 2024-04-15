@@ -33,6 +33,16 @@ Rmn_coeffs = np.array(Rmn_cos_coef).reshape(num_pol, num_tor, num_rad)[:, :, -1]
 Zmn_coeffs = np.array(Zmn_sin_coef).reshape(num_pol, num_tor, num_rad)[:, :, -1]
 
 
+def load_dist_field_data():
+    cwd = Path.cwd()
+    full_path = cwd / "matlab_data" / "results" / "50x50"
+    f_name = (
+        "50x50_BsBo.fld"  ### bs/b0 - glowne wyniki - ostatnia kolumna to error field
+    )
+    data = np.loadtxt(full_path / f_name, delimiter=",")
+    return data
+
+
 def calc_surface_fourier(
     phi, theta, Rmn_coeffs, Zmn_coeffs, Rmn_cos_num_pol, Rmn_cos_num_tor
 ):
@@ -70,7 +80,6 @@ def diff_surface(phi, theta, Rmn_coeffs, Zmn_coeffs, Rmn_cos_num_pol, Rmn_cos_nu
             dx_dtheta += Rmn * m * np.sin(Np * n * phi - m * theta) * np.cos(phi)
             dy_dtheta += Rmn * m * np.sin(phi) * np.sin(Np * n * phi - m * theta)
             dz_dtheta += Zmn * m * np.cos(Np * n * phi - m * theta)
-
     return dx_dphi, dy_dphi, dz_dphi, dx_dtheta, dy_dtheta, dz_dtheta
 
 
@@ -114,12 +123,13 @@ def plot_surface_and_normals(normal_vectors):
 
 
 def calc_disturbed_field_normal():
-    cwd = Path.cwd()
-    full_path = cwd / "matlab_data" / "results" / "50x50"
-    f_name = (
-        "50x50_BsBo.fld"  ### bs/b0 - glowne wyniki - ostatnia kolumna to error field
-    )
-    data = np.loadtxt(full_path / f_name, delimiter=",")
+    # cwd = Path.cwd()
+    # full_path = cwd / "matlab_data" / "results" / "50x50"
+    # f_name = (
+    #     "50x50_BsBo.fld"  ### bs/b0 - glowne wyniki - ostatnia kolumna to error field
+    # )
+    # data = np.loadtxt(full_path / f_name, delimiter=",")
+    data = load_dist_field_data()
     dist_field = data[:, -1]
     dist_field_norm_comp = dist_field / np.linalg.norm(normal_vectors, axis=1)
 
@@ -153,6 +163,21 @@ def calc_disturbed_field_normal():
     return dist_field, dist_field_norm_comp
 
 
+def calc_fft(x, y, z, normals_magnitude):
+    ### dist/undist
+    data = load_dist_field_data()
+    dist_field = data[:, -1]
+    undist_field_magnitude = normals_magnitude
+    field_err = dist_field.reshape(-1, 1) / undist_field_magnitude
+    # breakpoint()
+    # ### przeprowadzic fft2 dla field_err <- zrozumiec
+
+    # grid_x = x
+    # grid_y = y
+    # grid_z = z
+    # pass
+
+
 if __name__ == "__main__":
     x, y, z = calc_surface_fourier(
         phi,
@@ -178,5 +203,7 @@ if __name__ == "__main__":
         dy_dtheta,
         dz_dtheta,
     )
+
+    calc_fft(x, y, z, normals_magnitude)
     plot_surface_and_normals(normal_vectors)
     calc_disturbed_field_normal()
