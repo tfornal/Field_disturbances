@@ -148,9 +148,9 @@ def plot_surface_and_normals(x, y, z, normal_vectors):
         color="red",
         render_points_as_spheres=True,
     )
-    fig.add_arrows(
-        lcfs_points, normal_vectors_normalized, mag=0.1, color="red", opacity=1
-    )
+    # fig.add_arrows(
+    #     lcfs_points, normal_vectors_normalized, mag=0.1, color="red", opacity=1
+    # )
     fig.add_arrows(lcfs_points, normal_vectors, mag=0.1, color="orange", opacity=0.7)
 
     """Adds magnetic field vector"""
@@ -186,7 +186,6 @@ def add_magnetic_field_vector(fig):
                     for i in range(len(normal_vectors))
                 ]
             )
-
             return dot_products
 
         # prod = dot_product(normal_vectors, tangent_vectors)
@@ -205,23 +204,6 @@ def add_magnetic_field_vector(fig):
         are_perpendicular = are_perpendicular(normal_vectors, tangent_vectors)
 
         return are_perpendicular
-
-    tolerance = 6e-2
-    undisturbed_tangent = calculate_if_tangent_to_surface(
-        normal_vectors, undisturbed_vectors, tolerance
-    )
-    print(
-        f"All vectors on a surface for undisturbed for tolerance {tolerance} -----",
-        all(undisturbed_tangent),
-    )
-
-    disturbed_tangent = calculate_if_tangent_to_surface(
-        normal_vectors, disturbed_vectors, tolerance
-    )
-    print(
-        f"All vectors on a surface for disturbed for tolerance {tolerance} -----",
-        all(disturbed_tangent),
-    )
 
     def vector_projection(v, n):
         """
@@ -248,24 +230,46 @@ def add_magnetic_field_vector(fig):
         return projections
 
     """
-    .
-    .
-    .
-    .
-    
+    ***************************************************************************
+    ***************************************************************************
+    ***************************************************************************    
     """
-    projections_disturbed = vector_projection(disturbed_vectors, normal_vectors)
-    disturbed_normal_magnitude = np.linalg.norm(projections_disturbed, axis=1)
-    undisturbed_magnitude = np.linalg.norm(undisturbed_vectors, axis=1)
 
-    ###### czy to to?!!!!
-    B_err = disturbed_normal_magnitude / undisturbed_magnitude
+    tolerance = 6e-2
+    undisturbed_tangent = calculate_if_tangent_to_surface(
+        normal_vectors, undisturbed_vectors, tolerance
+    )
+    print(
+        f"All vectors on a surface for undisturbed for tolerance {tolerance} -----",
+        all(undisturbed_tangent),
+    )
+
+    disturbed_tangent = calculate_if_tangent_to_surface(
+        normal_vectors, disturbed_vectors, tolerance
+    )
+    print(
+        f"All vectors on a surface for disturbed for tolerance {tolerance} -----",
+        all(disturbed_tangent),
+    )
+
+    ## Calculate projections on normal vectors
+    dist_vect_projected_on_normal = vector_projection(disturbed_vectors, normal_vectors)
+
+    ## Calculate magnitudes
+    dist_projected_magnitude = np.linalg.norm(dist_vect_projected_on_normal, axis=1)
+    undisturbed_magnitude = np.linalg.norm(undisturbed_vectors, axis=1)
+    normal_vectors_magnitude = np.linalg.norm(normal_vectors, axis=1)
+
+    ## Calculate Error Field
+    B_err = dist_projected_magnitude / undisturbed_magnitude
+    # B_err = dist_projected_magnitude / normal_vectors_mag1nitude
+
+    breakpoint()
+
     """
-    .
-    .
-    .
-    .
-    
+    ***************************************************************************
+    ***************************************************************************
+    ***************************************************************************    
     """
 
     plot_magnetic_field_vectors(fig, undisturbed_vectors, disturbed_vectors)
@@ -365,5 +369,4 @@ if __name__ == "__main__":
         dz_dtheta,
     )
     B_err = plot_surface_and_normals(x, y, z, normal_vectors)
-    breakpoint()
     calc_fft(x, y, z, B_err.reshape((len(theta), len(phi))), len(theta), len(phi))
