@@ -111,20 +111,40 @@ def triangle_area_3d(A, B, C):
     return area
 
 
-def plot():
+def calculate_spheres():
 
-    fig = pv.Plotter()
-    fig.set_background("black")
-    x, y, z = data[:, 0], data[:, 1], data[:, 2]
-    fig.add_mesh(data, render_points_as_spheres=True)
-    fig.add_mesh(mid_points_dataset, color="red", render_points_as_spheres=True)
-    fig.add_mesh(
-        nearest_neighbors[0][:2],
-        color="purple",
-        point_size=15,
-        render_points_as_spheres=True,
-    )
-    fig.show()
+    spheres = []
+    for vertices in nearest_neighbors:
+        # vertices_combinations = list(combinations(i, 2))
+        # for idx in range(len(vertices) - 1):
+        dist_1 = distance(vertices[0], vertices[1])
+        dist_2 = distance(vertices[0], vertices[2])
+        dist_3 = distance(vertices[0], vertices[3])
+
+        distances = [dist_1, dist_2, dist_3]
+        max_value = max(distances)
+        max_index = distances.index(max_value)
+        points_left_indices = [1, 2, 3]
+        diagonal_point = points_left_indices.pop(max_index)
+        # diagonal_line = np.vstack(
+        #     (vertices[0].tolist(), vertices[diagonal_point].tolist())
+        # )
+        first_triangle_points = np.array(
+            (vertices[0], vertices[points_left_indices[0]], vertices[diagonal_point])
+        )
+        second_triangle_points = np.array(
+            (vertices[0], vertices[points_left_indices[1]], vertices[diagonal_point])
+        )
+
+        surface_area = triangle_area_3d(*first_triangle_points) + triangle_area_3d(
+            *second_triangle_points
+        )
+
+        thickness = 0.004  # mm
+        volume = float(surface_area * thickness)
+        radius = (3 * volume / 4 / np.pi) ** (1 / 3)
+        spheres.append(radius)
+    return spheres
 
 
 def test():
@@ -160,54 +180,75 @@ def distance(p1, p2):
     return d
 
 
+def plot():
+
+    fig = pv.Plotter()
+    fig.set_background("black")
+    x, y, z = data[:, 0], data[:, 1], data[:, 2]
+    # fig.add_mesh(data, render_points_as_spheres=True, color="yellow")
+    # fig.add_mesh(mid_points_dataset, color="red", render_points_as_spheres=True)
+    # fig.add_mesh(
+    #     nearest_neighbors[0][:2],
+    #     color="purple",
+    #     point_size=15,
+    #     render_points_as_spheres=True,
+    # )
+
+    def plot_spheres():
+        # fig.set_background("black")
+        point_cloud = pv.PolyData(points)
+        point_cloud["diameter"] = diameters
+        spheres = point_cloud.glyph(scale="diameter", geom=pv.Sphere())
+        fig.add_mesh(spheres, color="white", opacity=0.7)
+
+    plot_spheres()
+    fig.show()
+
+
 if __name__ == "__main__":
     cwd = Path.cwd() / "calc_spheres/"
     data = np.loadtxt(cwd / "theta-phi-121-721_endpoint-True.txt", delimiter=",")
 
-    mid_points_dataset = docelowe_dane()
+    mid_points_dataset = docelowe_dane()  ### 120x720 wierszy
     nearest_neighbors = find_nearest_neighbors(data, mid_points_dataset)
-    # wieksze_counter = 0
-    # mniejsze_counter = 0
-    spheres = []
-    for vertices in nearest_neighbors:
-        # vertices_combinations = list(combinations(i, 2))
-        # for idx in range(len(vertices) - 1):
-        dist_1 = distance(vertices[0], vertices[1])
-        dist_2 = distance(vertices[0], vertices[2])
-        dist_3 = distance(vertices[0], vertices[3])
-
-        distances = [dist_1, dist_2, dist_3]
-        max_value = max(distances)
-        max_index = distances.index(max_value)
-        points_left_indices = [1, 2, 3]
-        diagonal_point = points_left_indices.pop(max_index)
-        # diagonal_line = np.vstack(
-        #     (vertices[0].tolist(), vertices[diagonal_point].tolist())
-        # )
-        first_triangle_points = np.array(
-            (vertices[0], vertices[points_left_indices[0]], vertices[diagonal_point])
-        )
-        second_triangle_points = np.array(
-            (vertices[0], vertices[points_left_indices[1]], vertices[diagonal_point])
-        )
-        thickness = 4  # mm
-        surface_area = triangle_area_3d(*first_triangle_points) + triangle_area_3d(
-            *second_triangle_points
-        )
-        volume = float(surface_area * thickness)
-        spheres.append(volume)
+    spheres = calculate_spheres()
     data_with_spheres = np.concatenate((data, np.array(spheres).reshape(-1, 1)), axis=1)
-    points = data_with_spheres[:, :3]
-    diameters = data_with_spheres[:, 3]
 
-    plotter = pv.Plotter()
-    point_cloud = pv.PolyData(points)
-    point_cloud["diameter"] = diameters
+    def reduce_matrix(data_with_spheres):
+        data_with_spheres = data_with_spheres.reshape(721, 121, 4)
+        data_with_spheres = data_with_spheres[:-1, :, :]
+        data_with_spheres = data_with_spheres[:, :-1, :]
+        return data_with_spheres
 
-    spheres = point_cloud.glyph(scale="diameter", geom=pv.Sphere())
-    plotter.add_mesh(spheres, color="white", opacity=0.7)
+    data_with_spheres = reduce_matrix(data_with_spheres).reshape(-1, 4)
 
-    plotter.show()
+    def calculate_mu():
+        phi_step = 720
+        theta_step = 120
+        phi_values = np.linspace(0, 2 * np.pi, phi_step, endpoint=False)
+        theta_values = np.linspace(0, 2 * np.pi, theta_step, endpoint=False)
+        # theta, phi = np.meshgrid(theta, phi)
+        mu_list = []
+        for phi in phi_values:
+            for theta in theta_values:
+                mu = 1.015 + 0.015 * np.cos(phi - theta)
+                mu_list.append((mu))
+        mu_list = np.array(mu_list)
+        return mu_list
 
-    breakpoint()
+    mu_list = calculate_mu()
+    data_with_spheres_and_mu = np.concatenate(
+        (data_with_spheres, mu_list.reshape(-1, 1)), axis=1
+    )
+
+    points = data_with_spheres_and_mu[:, :3]
+    diameters = data_with_spheres_and_mu[:, 3]
+    from pathlib import Path
+
+    cwd = Path.cwd()
+    np.savetxt(
+        cwd / "calc_spheres" / "spheres_and.txt",
+        data_with_spheres_and_mu,
+        delimiter=",",
+    )
     plot()
