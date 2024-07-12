@@ -185,6 +185,7 @@ def plot():
     fig = pv.Plotter()
     fig.set_background("black")
     x, y, z = data[:, 0], data[:, 1], data[:, 2]
+
     # fig.add_mesh(data, render_points_as_spheres=True, color="yellow")
     # fig.add_mesh(mid_points_dataset, color="red", render_points_as_spheres=True)
     # fig.add_mesh(
@@ -193,14 +194,25 @@ def plot():
     #     point_size=15,
     #     render_points_as_spheres=True,
     # )
+    def plot_orignal_LCFS():
+        cwd = Path.cwd()
+        LCFS_original = "theta-phi-120-720_endpoint-False.txt"
+        LCFS_points = np.loadtxt(cwd / LCFS_original, delimiter=",", skiprows=1)[:17280]
+        fig.add_mesh(
+            np.array(LCFS_points),
+            color="yellow",
+            opacity=0.9,
+            render_points_as_spheres=True,
+        )
 
     def plot_spheres():
         # fig.set_background("black")
         point_cloud = pv.PolyData(points)
         point_cloud["diameter"] = diameters
         spheres = point_cloud.glyph(scale="diameter", geom=pv.Sphere())
-        fig.add_mesh(spheres, color="white", opacity=0.7)
+        fig.add_mesh(spheres, color="white")
 
+    plot_orignal_LCFS()
     plot_spheres()
     fig.show()
 
@@ -208,7 +220,6 @@ def plot():
 if __name__ == "__main__":
     input_files_path = Path.cwd() / "calc_spheres" / "input_files"
     fname = "theta-phi-121-721_endpoint-True_first_wall_50.0mm_offset"
-    breakpoint()
     data = np.loadtxt(input_files_path / f"{fname}.txt", delimiter=",")
 
     mid_points_dataset = docelowe_dane()  ### 120x720 wierszy
@@ -242,7 +253,7 @@ if __name__ == "__main__":
     mu_list = calculate_mu()
     data_with_spheres_and_mu = np.concatenate(
         (data_with_spheres, mu_list.reshape(-1, 1)), axis=1
-    )
+    )[:17280]
 
     points = data_with_spheres_and_mu[:, :3]
     diameters = data_with_spheres_and_mu[:, 3]
