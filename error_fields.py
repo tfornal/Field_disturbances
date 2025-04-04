@@ -8,11 +8,32 @@ from scipy.fftpack import fft2, ifft, ifftshift
 from matplotlib.ticker import ScalarFormatter
 
 ### powinno byc 51x51 endpoint false - should be then perfecly toroidally symmetric
-theta_step = 400
-phi_step = 2000
-# theta_step = 121
-# phi_step = 721
-endpoint = True
+
+
+##### First wall
+# theta_step = 81
+# phi_step = 481
+# theta_step = 80
+# phi_step = 480
+#
+
+###  For real divertor calculations
+
+divertor_precision = 20
+theta_step = 80
+phi_step = 480
+
+# theta_step = 120
+# phi_step = 720
+
+# theta_step = 400
+# phi_step = 2400
+
+# theta_step = 400
+# phi_step = 2000
+
+lcfs_offset = 0
+endpoint = False
 Np = 5
 plasma_surface = 98  # 0 - plasma axis, 98 - lcfs
 
@@ -32,6 +53,7 @@ with open(dir_path / "rmn_data.json", "r") as file:
     Rmn_cos_num_tor = Rmn_cos.get("toroidal_mode_numbers")
     Rmn_cos_num_rad = Rmn_cos.get("radial_points_number")
     Rmn_cos_coef = Rmn_cos.get("rmncos_coefficients")
+
 with open(dir_path / "zmn_data.json", "r") as file:
     Zmn_sin = json.load(file)
     Zmn_sin_num_pol = Zmn_sin.get("poloidal_mode_numbers")
@@ -124,12 +146,21 @@ def calc_normals(dx_dphi, dy_dphi, dz_dphi, dx_dtheta, dy_dtheta, dz_dtheta):
 
 
 def calc_offset_surface(
-    x, y, z, normal_vectors, normals_magnitude, offset_distance=50 / 1000
+    x, y, z, normal_vectors, normals_magnitude, offset_distance=0, save_file=False
 ):
+    offset_distance = offset_distance / 1000
     normals_normalized = normal_vectors / normals_magnitude.flatten()[:, np.newaxis]
     x_offset = x.flatten() + normals_normalized[:, 0] * offset_distance
     y_offset = y.flatten() + normals_normalized[:, 1] * offset_distance
     z_offset = z.flatten() + normals_normalized[:, 2] * offset_distance
+    full_path = Path.cwd() / "calc_spheres" / "input_files"
+    if save_file:
+        np.savetxt(
+            full_path
+            / f"theta-phi-{theta_step}-{phi_step}_endpoint-{endpoint}_first_wall_{offset_distance*1000}mm_offset.txt",
+            np.array((x_offset, y_offset, z_offset)).T,
+            delimiter=",",
+        )
     return x_offset, y_offset, z_offset
 
 
@@ -188,19 +219,14 @@ def vector_projection_new_function(v, n):
     dot_product_nn = np.dot(n, n)
     projection = dot_product_vn / np.sqrt(dot_product_nn)  # * n
 
-    ### second approach
-    # dot_product_nn2 = np.linalg.norm(n)
-    # projection2 = dot_product_vn / dot_product_nn2  # * n
     return projection
 
 
 def read_vector_data_from_matlab():
     cwd = Path.cwd()
 
-    # full_path = cwd / "matlab_data" / "results" / "test" / "test_symmetry"
-    full_path = cwd / "matlab_data" / "1st_case_higher_precision"
-
     def divertor_50_50_input_data():
+        full_path = cwd / "matlab_data" / "1st_case_higher_precision"
         disturbed_vectors = np.loadtxt(
             full_path
             / f"theta-phi-{theta_step}-{phi_step}_endpoint-{endpoint}_disturbed.txt",
@@ -211,101 +237,184 @@ def read_vector_data_from_matlab():
             / f"theta-phi-{theta_step}-{phi_step}_endpoint-{endpoint}_initial.txt",
             delimiter="\t",
         )
-        return disturbed_vectors, undisturbed_vectors
+        return disturbed_vectors, undisturbed_vectors, full_path
 
-    def test_points_10_symmetrical():
+    def first_case_120x720_full_div():
+        full_path = cwd / "matlab_data" / "first_case_120x720_full_div"
+
         disturbed_vectors = np.loadtxt(
+            full_path / f"___120_720_False_full_divertor_1.03_disturbed.fld",
+            delimiter=",",
+        )
+        undisturbed_vectors = np.loadtxt(
+            full_path / f"___120_720_False_full_divertor_1.03_initial.fld",
+            delimiter=",",
+        )
+
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def ___LCFS_80_480_x_mm_offset(offset):
+        full_path = cwd / "matlab_data" / "__LCFS" / f"{offset}"
+
+        disturbed_vectors = np.loadtxt(
+            full_path
+            / f"LCFS_theta_80_phi_480_offset_{offset}_and_mu_1.025_disturbed.fld",
+            delimiter=",",
+        )
+        undisturbed_vectors = np.loadtxt(
+            full_path
+            / f"LCFS_theta_80_phi_480_offset_{offset}_and_mu_1.025_initial.fld",
+            delimiter=",",
+        )
+
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def ___offset_dist(offset):
+        full_path = cwd / "matlab_data" / "___Offset_wall_undist_field" / f"{offset}"
+
+        disturbed_vectors = np.loadtxt(
+            full_path / f"{offset}_disturbed.fld",
+            delimiter=",",
+        )
+        undisturbed_vectors = np.loadtxt(
+            full_path / f"{offset}_initial.fld",
+            delimiter=",",
+        )
+
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_projected_400x2400():
+        full_path = cwd / "matlab_data" / "Divertor_projected" / "400x2400"
+
+        disturbed_vectors = np.loadtxt(
+            full_path / f"Divertor_projected_disturbed.fld",
+            delimiter=",",
+        )
+        undisturbed_vectors = np.loadtxt(
+            full_path / f"Divertor_projected_initial.fld",
+            delimiter=",",
+        )
+
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_103():
+        full_path = (
             cwd
             / "matlab_data"
-            / "results"
-            / "test"
-            / "test_symmetry"
-            / "2x5_div_high_prec"
-            / "2x5_divertor_disturbed.fld",
+            / "Divertor"
+            / f"1_divertor_103_theta-phi-{theta_step}-{phi_step}"
+        )
+        disturbed_vectors = np.loadtxt(
+            full_path
+            / f"1_divertor_103_theta-phi-{theta_step}-{phi_step}_disturbed.fld",
             delimiter=",",
         )
         undisturbed_vectors = np.loadtxt(
+            full_path / f"1_divertor_103_theta-phi-{theta_step}-{phi_step}_initial.fld",
+            delimiter=",",
+        )
+
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_105():
+        full_path = (
             cwd
             / "matlab_data"
-            / "results"
-            / "test"
-            / "test_symmetry"
-            / "2x5_div_high_prec"
-            / "2x5_divertor_initial.fld",
-            delimiter=",",
+            / "Divertor"
+            / f"2_divertor_105_theta-phi-{theta_step}-{phi_step}"
         )
-        return disturbed_vectors, undisturbed_vectors
 
-    def first_case():
-        full_path = cwd / "matlab_data" / "1st_case_higher_precision"
         disturbed_vectors = np.loadtxt(
-            full_path / f"theta-phi-100-100-False-False_div_1.03_disturbed.fld",
+            full_path
+            / f"2_divertor_105_theta-phi-{theta_step}-{phi_step}_disturbed.fld",
             delimiter=",",
         )
         undisturbed_vectors = np.loadtxt(
-            full_path / f"theta-phi-100-100-False-False_div_1.03_initial.fld",
+            full_path / f"2_divertor_105_theta-phi-{theta_step}-{phi_step}_initial.fld",
             delimiter=",",
         )
-        return disturbed_vectors, undisturbed_vectors
 
-    def first_case_v2():
-        full_path = cwd / "matlab_data" / "1st_case_higher_precision_2"
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_original():
+        full_path = (
+            cwd
+            / "matlab_data"
+            / "Divertor"
+            / f"3_divertor_original_theta-phi-{theta_step}-{phi_step}"
+        )
+
         disturbed_vectors = np.loadtxt(
-            full_path / f"50x300_False_div_1.03_disturbed.fld",
+            full_path
+            / f"3_divertor_original_theta-phi-{theta_step}-{phi_step}_disturbed.fld",
             delimiter=",",
         )
         undisturbed_vectors = np.loadtxt(
-            full_path / f"50x300_False_div_1.03_initial.fld",
+            full_path
+            / f"3_divertor_original_theta-phi-{theta_step}-{phi_step}_initial.fld",
             delimiter=",",
         )
-        return disturbed_vectors, undisturbed_vectors
 
-    def second_case_first_wall():
-        full_path = cwd / "matlab_data" / "2nd_case_first_wall"
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_projected():
+        full_path = (
+            cwd
+            / "matlab_data"
+            / "Divertor"
+            / f"4_divertor_projected_theta-phi-{theta_step}-{phi_step}"
+        )
+
         disturbed_vectors = np.loadtxt(
-            full_path / f"First_wall_100mm_offset_mu1.03_4mmW_disturbed.fld",
+            full_path
+            / f"4_divertor_projected_theta-phi-{theta_step}-{phi_step}_disturbed.fld",
             delimiter=",",
         )
         undisturbed_vectors = np.loadtxt(
-            full_path / f"First_wall_100mm_offset_mu1.03_4mmW_initial.fld",
+            full_path
+            / f"4_divertor_projected_theta-phi-{theta_step}-{phi_step}_initial.fld",
             delimiter=",",
         )
-        return disturbed_vectors, undisturbed_vectors
 
-    def najgestsa_jeden_div():
-        full_path = cwd / "matlab_data" / "400x2000"
+        return disturbed_vectors, undisturbed_vectors, full_path
+
+    def divertor_projected_higher_precision():
+        full_path = (
+            cwd
+            / "matlab_data"
+            / "Divertor"
+            / "Higher_precision"
+            / f"{divertor_precision}mm"
+            / f"full_divertor_{divertor_precision}mm_projected_theta-phi-{theta_step}-{phi_step}"
+        )
+
         disturbed_vectors = np.loadtxt(
-            full_path / f"400x2000_1div_mod_disturbed.fld",
+            full_path
+            / f"full_divertor_{divertor_precision}mm_projected_theta-phi-{theta_step}-{phi_step}_disturbed.fld",
             delimiter=",",
         )
         undisturbed_vectors = np.loadtxt(
-            full_path / f"400x2000_1div_mod_initial.fld",
+            full_path
+            / f"full_divertor_{divertor_precision}mm_projected_theta-phi-{theta_step}-{phi_step}_initial.fld",
             delimiter=",",
         )
-        return disturbed_vectors, undisturbed_vectors
 
-    def gesta_400x2000_caly_divertor():
-        full_path = cwd / "matlab_data" / "400x2000-caly_divertor"
+        return disturbed_vectors, undisturbed_vectors, full_path
 
-        disturbed_vectors = np.loadtxt(
-            full_path / f"400x2000-caly_divertor_disturbed.fld",
-            delimiter=",",
-        )
-        undisturbed_vectors = np.loadtxt(
-            full_path / f"400x2000-caly_divertor_initial.fld",
-            delimiter=",",
-        )
-        return disturbed_vectors, undisturbed_vectors
+    # disturbed_vectors, undisturbed_vectors, full_path = divertor_50_50_input_data()
+    # disturbed_vectors, undisturbed_vectors, full_path = first_case_120x720_full_div()
+    # disturbed_vectors, undisturbed_vectors, full_path = ___LCFS_80_480_x_mm_offset(50)
+    # disturbed_vectors, undisturbed_vectors, full_path = ___offset_dist(50)
+    # disturbed_vectors, undisturbed_vectors, full_path = divertor_projected_400x2400()
+    # disturbed_vectors, undisturbed_vectors, full_path = divertor_103()
+    disturbed_vectors, undisturbed_vectors, full_path = divertor_105()
+    # disturbed_vectors, undisturbed_vectors, full_path = divertor_original()
+    # disturbed_vectors, undisturbed_vectors, full_path = divertor_projected()
+    # disturbed_vectors, undisturbed_vectors, full_path = (
+    #     divertor_projected_higher_precision()
+    # )
 
-    # disturbed_vectors, undisturbed_vectors = divertor_50_50_input_data()
-    # disturbed_vectors, undisturbed_vectors = test_points_10_symmetrical()
-    # disturbed_vectors, undisturbed_vectors = first_case()
-    # disturbed_vectors, undisturbed_vectors = first_case_v2()
-    # disturbed_vectors, undisturbed_vectors = second_case_first_wall()
-    # disturbed_vectors, undisturbed_vectors = najgestsa_jeden_div()
-    disturbed_vectors, undisturbed_vectors = gesta_400x2000_caly_divertor()
-
-    return undisturbed_vectors, disturbed_vectors
+    return undisturbed_vectors, disturbed_vectors, full_path
 
 
 def calc_error_field(undisturbed_data, disturbed_data):
@@ -351,63 +460,6 @@ def plot_magnetic_field_vectors(fig, undisturbed_vectors, disturbed_vectors):
     return fig
 
 
-def plot_vectors_positions_as_lines(fig, undisturbed_vectors, disturbed_vectors):
-    lcfs_points = np.array((x.flatten(), y.flatten(), z.flatten())).T
-    przekroj_poloidalny = 5
-    # phi_step = 1
-    zakres_start = przekroj_poloidalny * phi_step
-    zakres_stop = przekroj_poloidalny * phi_step + 30
-    # for i in np.arange(zakres_start, zakres_stop):
-
-    #### inwards
-    for i in np.arange(525, 530):
-        # breakpoint()
-        print(i)
-        line_undisturbed = pv.Line(
-            lcfs_points[i], lcfs_points[i] + undisturbed_vectors[i]
-        )
-        line_disturbed = pv.Line(lcfs_points[i], lcfs_points[i] + disturbed_vectors[i])
-        # breakpoint()
-        fig.add_mesh(
-            line_undisturbed,
-            # mag=0.2,
-            color="purple",
-            # opacity=0.2,
-            line_width=2,
-        )
-        fig.add_mesh(
-            line_disturbed,
-            # mag=0.2,
-            color="red",
-            # opacity=0.2,
-            line_width=2,
-        )
-
-    ### outwards
-    for i in [1571, 1671]:
-        # breakpoint()
-        print(i)
-        line_undisturbed = pv.Line(
-            lcfs_points[i], lcfs_points[i] + undisturbed_vectors[i]
-        )
-        line_disturbed = pv.Line(lcfs_points[i], lcfs_points[i] + disturbed_vectors[i])
-        # breakpoint()
-        fig.add_mesh(
-            line_undisturbed,
-            # mag=0.2,
-            color="purple",
-            # opacity=0.2,
-            line_width=2,
-        )
-        fig.add_mesh(
-            line_disturbed,
-            # mag=0.2,
-            color="red",
-            # opacity=0.2,
-            line_width=2,
-        )
-
-
 def plot_projected_vectors(fig, projected_vectors):
     magnitude_projected_vectors = 400
     lcfs_points = np.array((x.flatten(), y.flatten(), z.flatten())).T
@@ -423,21 +475,29 @@ def plot_projected_vectors(fig, projected_vectors):
 
 def plot_divertor(fig):
     cwd = Path.cwd()
-    full_path = Path.cwd() / "matlab_data" / "results" / "test"
+    full_path = Path.cwd()
 
-    f_name = "divertorx10clean.txt"  ### dane divertora
+    f_name = "divertor_projected.txt"  ### dane divertora
     data = np.loadtxt(full_path / f_name, delimiter=",")
-    lcfs_points = data[:, :3]
-    cloud = pv.PolyData(lcfs_points)
-    cloud["point_color"] = data[:, -2]  # just use z coordinate
-    fig.add_mesh(
-        lcfs_points,
-        color="white",
-        # scalars="point_color",
-        cmap="viridis",
-        render_points_as_spheres=True,
-        point_size=5,
-    )
+    point_cloud = pv.PolyData(data[:, :-2])
+    # point_cloud["diameter"] = data[:, -2] * 2
+    # spheres = point_cloud.glyph(scale="diameter", geom=pv.Sphere())
+    # fig.add_mesh(spheres, color="white", opacity=0.7)
+
+    point_cloud["mu"] = data[:, -1]
+    fig.add_mesh(point_cloud, opacity=0.7, render_points_as_spheres=True)
+
+    # lcfs_points = data[:, :3]
+    # cloud = pv.PolyData(lcfs_points)
+    # cloud["point_color"] = data[:, -2]  # just use z coordinate
+    # fig.add_mesh(
+    #     lcfs_points,
+    #     color="white",
+    #     # scalars="point_color",
+    #     cmap="viridis",
+    #     render_points_as_spheres=True,
+    #     point_size=5,
+    # )
 
 
 def od_jorisa(fig):
@@ -450,12 +510,12 @@ def od_jorisa(fig):
     firstwall = np.loadtxt(first_wall_data, delimiter=",")
     divertor = np.loadtxt(divertor_data, delimiter=",")
 
-    # ### firstwall
-    # fig.add_mesh(
-    #     firstwall[:, :3],
-    #     color="orange",
-    #     render_points_as_spheres=True,
-    # )
+    ### firstwall
+    fig.add_mesh(
+        firstwall[:, :3],
+        color="orange",
+        render_points_as_spheres=True,
+    )
 
     ### divertor with fixed sphere sizes
     point_cloud = pv.PolyData(divertor[:, :3])
@@ -472,30 +532,27 @@ def plot_offset_points(fig):
     )
     offset_points = np.array((x_offset, y_offset, z_offset)).T
     fig.add_mesh(
-        offset_points,
-        color="red",
-        render_points_as_spheres=True,
+        offset_points, color="blue", render_points_as_spheres=True, opacity=0.3
     )
 
 
 def plot_w7x(x, y, z, normal_vectors, plot=False):
     fig = pv.Plotter()
     grid = pv.StructuredGrid(x, y, z)
-    breakpoint()
     lcfs_points = np.array((x.flatten(), y.flatten(), z.flatten())).T
     fig.set_background("black")
-    fig.add_mesh(
-        grid,
-        opacity=0.4,
-        color="green",
-    )
+    # fig.add_mesh(
+    #     grid,
+    #     opacity=0.4,
+    #     color="green",
+    # )
 
-    fig.add_mesh(
-        lcfs_points,
-        color="yellow",
-        opacity=0.2,
-        render_points_as_spheres=True,
-    )
+    # fig.add_mesh(
+    #     lcfs_points,
+    #     color="yellow",
+    #     opacity=0.2,
+    #     render_points_as_spheres=True,
+    # )
 
     """Dodaje info z plikow od jorisa"""
     # od_jorisa(fig)
@@ -512,11 +569,6 @@ def plot_w7x(x, y, z, normal_vectors, plot=False):
     """Adds magnetic field vector"""
     # plot_magnetic_field_vectors(fig, undisturbed_data[:, -3:], disturbed_data[:, -3:])
 
-    """Adds magnetic field vectors as lines"""
-    # plot_vectors_positions_as_lines(
-    #     fig, undisturbed_data[:, -3:], disturbed_data[:, -3:]
-    # )
-
     """Adds divertors"""
     plot_divertor(fig)
 
@@ -529,21 +581,25 @@ def calc_fft(B_err):  ##### nowa wersja -
 
     n, m = B_err.shape
     nr_of_points = n * m
-    normalized_fft_data = fft_result / (np.sqrt(nr_of_points))
-    # fft_result_shifted = np.fft.fftshift(normalized_fft_data)
 
+    # normalized_fft_data = fft_result / np.sqrt((nr_of_points))
+    ##### nowa normalizacja!!!!!!1
+    normalized_fft_data = fft_result / (nr_of_points)
     fft_result_inversed = np.fft.ifft2(fft_result)
-
     return normalized_fft_data, fft_result_inversed
     # return fft_result_shifted, fft_result_inversed
 
 
 def plot_fft(field_err, fft_result_shifted, fft_result_inversed):
 
-    plt.figure(figsize=(13, 5))  # szerokość x wysokość
+    plt.figure(figsize=(16, 5))  # szerokość x wysokość
     # plt.suptitle("Normal components - First_wall = 100mm; mu = 1.03, WNiFe = 4mm")
-    plt.suptitle("Normal components")
+    plt.suptitle(
+        f"Error fields {theta_step} x {phi_step} points; Full 4mm WNiFe divertor"
+    )
     plt.subplot(121)
+    plt.subplots_adjust(right=0.8)
+
     im1 = plt.imshow(field_err, cmap="viridis", aspect="auto")
     cbar1 = plt.colorbar(im1, label="Amplitude")
     cbar1.formatter = ScalarFormatter()
@@ -555,17 +611,28 @@ def plot_fft(field_err, fft_result_shifted, fft_result_inversed):
 
     plt.subplot(122)
     im2 = plt.imshow(
-        np.abs(fft_result_shifted),
-        cmap="viridis",
-        aspect="auto",
-    )  # , norm="log")
+        np.abs(fft_result_shifted), cmap="viridis", aspect="auto", norm="log"
+    )
     cbar2 = plt.colorbar(im2, label="Amplitude")
     cbar2.formatter = ScalarFormatter()
     cbar2.formatter.set_powerlimits((0, 0))
     cbar2.update_ticks()
+
+    position_h = 650
+    plt.text(position_h, 0, "FFT2 components:", fontsize=12, color="red")
+    for i in range(6):
+        print(f"B[{i}][{i}]", f"{abs(fft_result_shifted[i][i]):.2e}")
+
+        plt.text(
+            position_h,
+            5 + 5 * i,
+            f"B[{i}][{i}] = {abs(fft_result_shifted[i][i]):.2e}",
+            fontsize=12,
+            color="red",
+        )
+
     plt.title("FFT2")
-    # plt.xlabel("m")
-    # plt.ylabel("n")
+    plt.savefig(f"{full_path}/{full_path.stem}.png", dpi=300)
     plt.show()
 
 
@@ -597,20 +664,29 @@ if __name__ == "__main__":
         dz_dtheta,
     )
 
-    ## calculate offset
-    x_offset, y_offset, z_offset = calc_offset_surface(
-        x, y, z, normal_vectors, normals_magnitude
-    )
+    # ## calculate offset
+    # x_offset, y_offset, z_offset = calc_offset_surface(
+    #     x,
+    #     y,
+    #     z,
+    #     normal_vectors,
+    #     normals_magnitude,
+    #     offset_distance=lcfs_offset,
+    #     save_file=False,
+    # )
 
     # ### get matlab data
-    undisturbed_data, disturbed_data = read_vector_data_from_matlab()
+    undisturbed_data, disturbed_data, full_path = read_vector_data_from_matlab()
 
     # ### substract vectors
     projected_vectors_in_normal_dir, B_err = calc_error_field(
         undisturbed_data, disturbed_data
     )
-    plot_w7x(x, y, z, normal_vectors, plot=True)
+    # plot_w7x(x, y, z, normal_vectors, plot=True)
 
-    # # # ### FFT2
+    # # # # ### FFT2
     fft_result_shifted, fft_result_inversed = calc_fft(B_err)
     plot_fft(B_err, fft_result_shifted, fft_result_inversed)
+
+
+## need flux normalization;
